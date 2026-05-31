@@ -1,0 +1,226 @@
+---
+title: "Week_eleven_lee_d"
+author: "Dong Lee"
+date: "2025-05-25"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r import}
+
+#read raw data from csv
+df <- read.csv("https://raw.githubusercontent.com/bellevue-university/dsc520/refs/heads/master/assignments/version_two/12_week/week_11/Housing.csv")
+
+summary(df)
+#head(df)
+
+```
+
+
+## Data analysis
+
+```{r data analysis}
+
+#checkign for NAs or blanks - none found
+colSums(is.na(df))
+
+#checking data distribution of price and area
+hist(df$price)
+boxplot(df$price)
+
+hist(df$area)
+boxplot(df$area)
+
+
+#Checking unique values
+cat(unique(df$furnishingstatus))
+cat(unique(df$prefarea))
+cat(unique(df$airconditioning))
+cat(unique(df$guestroom))
+cat(unique(df$basement))
+cat(unique(df$hotwaterheating))
+
+
+```
+<br>
+
+Before applying any modeling, I conducted an initial exploration of the dataset to assess vaiable distributions and identify any potential issues. The target variable, price, revealed a significant right skew, indicating that the data includes a center of moderately priced homes and a tail of higher priced homes. This skewness can violate the assumptions of linear regression of normally distributed residuals and constant variance. The same logic applies to the variable, area, with a right skew.
+
+I also looked at the data types of variables. Several columns contain binary responses "yes" or "no". The furnishingstatus variable contains categorical feature with 3 distinct levels.
+
+No missing values were found in the dataset, so no imputation or removals are needed.
+
+
+## Data transformation
+
+Based on the initial analysis the following transformations are applied:
+
+- Log transformation of price and area: The right skewed distributions of price and area suggest that a log transformation would reduce the influence of outliers and stabilizes variance of the distributions.
+
+- Categorical encoding on binary variables: Columns with "yes" or "no" were converted to factors and are treated as categorical variables in the regression model.
+
+- furnishingstatus variable is also converted to a factor to capture its categories
+
+- Nothing to be done for discrete variables such as bedrooms and bathrooms to maintain as numeric predictors.
+
+```{r data transformations}
+
+#log transformation of price and area
+df$log_price <- log(df$price)
+df$log_area <- log(df$area)
+
+hist(df$log_area)
+hist(df$log_price)
+
+#binary vars to factors
+df$mainroad <- as.factor(df$mainroad)
+df$guestroom <- as.factor(df$guestroom)
+df$basement <- as.factor(df$basement)
+df$hotwaterheating <- as.factor(df$hotwaterheating)
+df$airconditioning <- as.factor(df$airconditioning)
+df$prefarea <- as.factor(df$prefarea)
+df$furnishingstatus <- as.factor(df$furnishingstatus)
+
+
+```
+
+
+## Linear regression - area
+
+
+```{r linear regression - area}
+#check linearity
+plot(log_price ~ log_area, data = df)
+
+#build the model with log transformed data
+model <- lm(log_price ~ log_area, data = df)
+
+summary(model)
+
+
+residuals <- resid(model)
+mse <- mean(residuals^2)
+rmse <- sqrt(mse)
+
+cat("mse =",mse,"rmse =", rmse)
+
+#plotting residuals
+plot(fitted(model), residuals, main='residuals vs fitted values')
+
+#qq plot
+qqnorm(residuals, main = 'QQ plot of redisuals')
+qqline(residuals)
+```
+<br>
+
+
+The model can be written as:
+
+$log(price) = 10.72 + 0.54*log(area)$
+
+This model uses log(area) to predict log(price). The model shows a statistically significasnt positive relationship: the coefficient is 0.54 with p < 2.23-16, indicating that a 1 % increase in area is associated with 0.54% increase in price. The model explains about 33.7% of the variation in sale price (R^2 = 0.3365), which is reasonable for a single predictor. The adjusted R^2 value is almost identical with 0.3353 since the model includes only one predictor. The residual standard erro and RMSE are both approximately 0.303, indicating moderate dispersion around the fitted values. The F-statistic confirms that the model is statistically significant overall (275.4, p < 2.2e-16).
+
+The residual plot shows that the residuals are mostly centered around zero and show no clear patter, which supports the assumption of linearity between log_area  and log_price. There is some mild variation sprea across the fitted values, but no obvious shapes, suggesting homoscedasticity. The distribution of points appears relatively symmetric with no indication of strong outliers.
+
+The Q-Q plot shows that the residuals from the model closely follow the 45-degree reference line, with only slight deviation at the tails. This suggests that the residuals area approximately normally distributed. The residuals meet the normality assumption. The slight deviation at the tails do not significantly violate the assumption of normality for linear regression. This supports the validity of statistical inference from the model.
+
+## Linear regression - multi variables
+
+For the multiple linear regression model, I selected set of five predictor variables based on their potential influence on housing sale price:
+
+  - log_area: log area remains as the foundation of the model as property size is one of the most influential factor that affects housing prices. Larger homes generally cost more.
+  
+  - bathrooms: more bathrooms are associated with increased convenience, and are often considered as a premium feature.
+  
+  - airconditioning: air conditioning is an important amenity, where the importance varies depending on regions. Homes with air conditioning are typically more desirable and can justify higher prices.
+  
+  - prefarea: This variable indicating a home located in a preferred neighborhood has a substantial impact on real estate valuation.
+  
+  - furnishingstatus: the furnishing status indicated the readiness of homes and perceived as luxury option. Fully furnished homes would have higher asking prices due to added convenience.
+  
+
+```{r multi}
+
+#build model
+model_2 <- lm(log_price ~ log_area + bathrooms + airconditioning + prefarea + furnishingstatus, data =df)
+
+#model summary
+summary(model_2)
+
+residuals_2 <- resid(model_2)
+mse_2 <- mean(residuals_2^2)
+rmse_2 <- sqrt(mse_2)
+
+cat("mse =",mse_2,"rmse =", rmse_2)
+
+plot(fitted(model_2), residuals_2, main = 'residuals vs fitted values')
+
+#qq plot
+qqnorm(residuals_2, main = 'QQ plot of redisuals')
+qqline(residuals_2)
+```
+
+The model equation:
+
+$log(price) = 11.968 + 0.352*log(area) + 0.239*bathrooms + 0.204*airconditioning_yes + 0.168*preferarea_yes + 0.001*semifurnished - 0.158*unfurnished$
+
+Coefficients:
+
+  - log area: 0.352, p < 2e-16. 1% increase in area is associated with 0.352% increase in price when other variables are constant.
+  
+  - bathrooms: 0.239, p < 2e-16. Each additional bathroom is associated with 23.9% increase in sale price with other variables constant.
+  
+  - airconditioning_yes: 0.204, p < 2e-16. Homes with air conditioning have 20.4% higher sale price with other variables constant.  
+  
+  - prefarea_yes: 0.168, p = 6.48e-12. Homes in preferred areas are associated with 16.8% higher sale price with other variables constant.
+  
+  - semi-furnished: p = 0.965. The p-value indicates that there is no clear difference compared to fully furnished homes.
+  
+  - unfurnished: -0.158, p < 0.001. Unfurnished homes cost 15.8% less than furnished homes.
+
+
+The R-squared value of 0.624 indicates that approximately 62.4% of the variation in the log-transformed sale price can be explained by the predictor variables. The adjusted R^2 value of 0.62 suggest that the model's performance is not a result of overfitting. The residual standard error is 0.229. On average, the model' predictions deviate from the actual log_price values by 0.229 units. This relatively low level of dispersion supports the accuracy and consistency of the fitted values. The F-statistic for the overall model is 148.9 with a p-value < 22.e-16 indicating that the regression is statistically significant.
+
+The residual plot shows that distribution of residuals appears roughly centered around zero with no obvious pattern. This randon scatter suggests that the linearity assumption is satisfied, meaning that there is no indication that the model is under or over predicting across fitted values. The spread of the residuals are fairly constant across the fitted values, which supports the homoscedasticity. There are few mild outliers but they do not indicate any directional trend or extreme deviation from the data.
+
+The Q-Q plot shows that most of the residuals align closely with the reference line, especially around the center of the distribution. This suggests that the residuals assume normality reasonably across the majority of the data. There are some deviations at both tails where few points fall below/above the reference line. However, thses deviations are relatively small and not unusual. They do not indicate a extreme deviation from normality. Based on the plot, residuals meet the normality assumption.
+
+
+## Model comparison
+
+```{r anova}
+
+#conduct ANOVA on the models
+anova(model, model_2)
+
+```
+
+The first model:
+
+  - R2 = 0.3365
+  
+  - adj R2 = 0.3353
+  
+  - RMSE = 0.3034
+  
+  - MSE = 0.0921
+
+The second model:
+
+  - R2 = 0.6242
+  
+  - adj R2 = 0.6200
+  
+  - RMSE = 0.2279
+  
+  - MSE = 0.0520
+
+According to the performance metrics above, the multiple regression model outperforms the single model across all measures. It account for a larger portion of the variance in housing sale price and yields lower average prediction error. The increase in R2 from 33/7% to 62.4% indicates the inclusion of additional features explains the sale price better.
+
+The ANOVA test results show an F-statistic of 82.357 with p < 2.2e-16. This confirms that the additional variables in the second model lead to a significantly better fit.
+
+
+

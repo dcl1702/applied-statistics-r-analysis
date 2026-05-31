@@ -1,0 +1,94 @@
+---
+title: "Week_ten_lee_d"
+author: "Dong Lee"
+date: "2025-05-18"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+
+```
+
+
+```{r import}
+library(ggplot2)
+library(AICcmodavg)
+
+
+
+#read raw data from csv
+df <- read.csv("http://raw.githubusercontent.com/bellevue-university/dsc520/refs/heads/master/assignments/version_two/12_week/week_09_and_10/travel_insurance.csv")
+
+#summary(df)
+head(df)
+
+```
+
+## ANOVA
+
+### Choosing variables
+
+There are four possible candidates for dependent variable: Net Sales, Commission, Duration, Age. These variables are all continuous, making them suitable for ANOVA.
+And categorical data for factors: Agency, Agency Type, Distribution Channel, Product Name, Claim, Destination, Gender
+
+Net Sales was selected as the dependent variable because it represents the main financial outcome for the business. Product Name was selected because different insurance plans are priced differently and likely to have varying sales. Distribution Channel was included because it may affect customer behavior and potentially total sales. Agency Type was also selected because airlines and travel agencies may offer different products and influence net sales. The three categorical variables are ties to how insurance is structured and sold and likely to cause variation in total sales.
+
+
+### ANOVA and AIC
+
+```{r ANOVA}
+
+#rename for convenience
+names(df)[names(df) == "Net.Sales"] <- "Net_Sales"
+
+# new vars as categorical groups
+df$Product_Name <- as.factor(df$Product.Name)
+df$Distribution <- as.factor(df$Distribution.Channel)
+df$Agency_Type <- as.factor(df$Agency.Type)
+
+#remove missing values
+non_empty <- complete.cases(df[, c("Net_Sales", "Product_Name", "Distribution", "Agency_Type")])
+df <- df[non_empty,]
+
+# one way ANOVA
+one_way <- aov(Net_Sales ~ Product_Name, data = df)
+summary(one_way)
+
+#two way ANOVA
+two_way <- aov(Net_Sales ~ Product_Name + Distribution + Agency_Type, data = df)
+summary(two_way)
+
+#two way ANOVA with interactions
+interaction <- aov(Net_Sales ~ Product_Name * Distribution * Agency_Type, data = df)
+summary(interaction)
+
+#AIC comparison
+
+model.set <- list(one_way, two_way, interaction)
+model.names <- c('one_way', 'two_way', 'interaction')
+
+aictab(model.set, modnames = model.names)
+```
+
+### Model comparisons
+
+Model comparison:
+
+  - The two_way model that includes main effects of Product_Name, Distribution, and Agency_type has the lowest AICc and the highest model weight of 0.5, making it the best supported model in this dataset.\
+  - The one_way model with Product_Name is very close with just 0.5 AICc difference. It is statistically indistinguishable from the two-way model with weight of 0.39.
+  - The full interaction model adds three-way interactions but only improves AICc by 2.93 indicating moderate support but suggests those extra parameters may not justify themselves fully.
+  - Since the delta AICc between the one_way and the two_way is small, any of both can be selected.
+
+Online vs offline and airline vs travel agency do matter but each only adds a small improvement on top of product effects. It may be simpler to focus on the product-only model that nearly matches the full three interaction model.
+
+
+
+
+
+
+
+
+
+

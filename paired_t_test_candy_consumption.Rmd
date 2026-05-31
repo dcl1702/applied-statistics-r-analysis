@@ -1,0 +1,98 @@
+---
+title: "week_eight_lee_d"
+author: "Dong Lee"
+date: "2025-05-04"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Research question
+
+A researcher hypothesizes that kids watching TV will result in an increase in the number of pieces of candy corn eaten. The kids are subjected to 5 hours of television. The number of candy corn candies consumed during a 10-minute period is counted both with and without TV.
+
+### Data
+
+```{r data}
+# Create a data frame for the candy corn consumption data
+candy_data <- data.frame(
+  Experiment = 1:10,
+  With_TV = c(12, 7, 3, 11, 8, 5, 14, 7, 9, 10),
+  Without_TV = c(8, 7, 4, 14, 6, 7, 12, 5, 5, 8)
+)
+
+```
+
+### Computation
+
+``` {r compute}
+#Calculate the differences (With TV - Without TV)
+candy_data$Difference <- candy_data$With_TV - candy_data$Without_TV
+
+#mean of differences
+mean_diff <- mean(candy_data$Difference)
+
+#variance and standard deviation of differences
+var_diff <- var(candy_data$Difference)
+sd_diff <- sd(candy_data$Difference)
+
+cat("Mean =", mean_diff, "\n")
+cat("S =", sd_diff, "\n")
+cat("S² =", var_diff, "\n")
+```
+
+The mean difference of 1 represents that the average increase in candy corn consumption when kids watch TV compared to when they don't. A positive value of 1 indicates that kids eat more candy corn when watching TV on average.
+
+The standard deviation of 2.404 represents spread of the differences between observations. It indicates how consistent watching TV affects candy corn assumption across kids. A larger S suggests more variability.
+
+The variance of 5.778 represents another measure of variability in the differences. It is important for calculating standard error in the t-test.
+
+### T-test analysis
+
+```{r t-test}
+# calculate standard error
+n <- nrow(candy_data)
+se <- sd_diff / sqrt(n)
+
+# t-statistic
+t_stat <- mean_diff / se
+
+# degrees of freedom
+df <- n - 1
+
+# Calculate p-value (two-tailed test)
+p_value <- 2 * pt(abs(t_stat), df, lower.tail = FALSE)
+
+
+cat("t-statistic =", t_stat, "\n")
+cat("Degrees of freedom =", df, "\n")
+cat("p-value =", p_value, "\n")
+
+# verifying with t.test function
+t_test_result <- t.test(candy_data$With_TV, candy_data$Without_TV, paired = TRUE)
+
+t_test_result
+```
+
+The computed t-statistic is 1.316. This value represents how many standard errors the sample mean difference is away from the null hypothesis value.
+
+The null hypothesis in this study is that there is no difference in candy corn consumption between the "With TV" and "Without TV" conditions.
+
+$H_0: \mu_d = 0$ where $\mu_d$ represents the true mean difference in the population.
+
+The alternative hypothesis is that there is a difference in candy corn consumption between the "With TV" and "Without TV" conditions.
+
+I chose the conventional probability level of 0.05 for this study. This means that we would rejject the null hypothesis if there is less than a 5% chance of observing the data if the null hypothesis were true. This value balances the risks of Type I error of falsely rejecting a true null hypothesis and Type II error of failing to reject a false null hypothesis. And this level is also a standard practice in social science research.
+
+The degrees of freedom for a paired t-test is n-1, where n is the number of pairs. In this study, degrees of freedom = 10 - 1 = 9.
+
+With a t-test statistic of 1.316 and 9 degrees of freedom, the p-value is approximately 0.22 for two-tailed. Since the p-value is greater than the alpha value of 0.05, we fail to reject the null hypothesis. This means that although the kids consumed on average 1 more candy corn when watching TV versus not watching TV, this difference is not statistically significant. The observed difference could be due to random chance rather than a true effect of watching TV on candy corn consumption.
+
+
+
+
+
+
+

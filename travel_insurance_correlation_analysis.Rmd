@@ -1,0 +1,172 @@
+---
+title: "Week_nine_lee_d"
+author: "Dong Lee"
+date: "2025-05-11"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Correlation
+
+
+```{r library and data}
+library(corrplot)
+library(SnowballC)
+library(lsa)
+library(ggplot2)
+
+#read raw data from csv
+df <- read.csv("http://raw.githubusercontent.com/bellevue-university/dsc520/refs/heads/master/assignments/version_two/12_week/week_09_and_10/travel_insurance.csv")
+
+summary(df)
+head(df)
+```
+
+
+```{r correlation}
+
+# 1.calculating correlation between Age and Duration
+cor <- cor(df$Age, df$Duration)
+cat(cor, "\n")
+
+# 2.calculating Pearson, Spearman, and Kendall correlations between Net Sales and Commission
+# spearman and kendall correlations have 'exact=FALSE' to handle ties
+pearson_cor <- cor.test(df$Net.Sales, df$Commision..in.value., method = 'pearson')
+spearman_cor <- cor.test(df$Net.Sales, df$Commision..in.value., method = 'spearman', exact = FALSE)
+kendall_cor <- cor.test(df$Net.Sales, df$Commision..in.value., method = 'kendall', exact = FALSE)
+
+cat("Pearson correlation coefficient:", pearson_cor$estimate, 
+    "\nP-value:", pearson_cor$p.value, "\n\n")
+
+cat("Spearman correlation coefficient:", spearman_cor$estimate, 
+    "\nP-value:", spearman_cor$p.value, "\n\n")
+
+cat("Kendall correlation coefficient:", kendall_cor$estimate, 
+    "\nP-value:", kendall_cor$p.value, "\n\n")
+
+```
+
+I chose Age and Duration variables to see if there are any relationships between the two varibles. The relationship between a traveler's age and how long they travel would have a meaningful business perspective. Understanding the relationship can help insurance businesses to create optimal coverage duration according to age groups.
+
+The correlation value of 0.0025 is weak, and nearly zero correlation, practically non-existent linear relationship between Age and Duration. With this result, the marketing strategies for the insurance companies shouldn't segment trip duration offerings based on age. 
+
+<br>
+<br>
+
+Net Sales and Commission in Value variables have a natural financial relationship where commissions are typically percentage of sales so we can expect a strong correlation. Different correlation methods can explain different insights:
+
+ - Pearson: shows the linear relationship between the raw values
+ - Spearman: shows if higher sales consistently results in higher commissions
+ - Kendall: shows if the relationship holds even with unusual sales numbers.
+
+Interpretations on the results:
+
+ - Pearson correlation value of 0.65 and p-value of 0 indicates that a moderately strong positive linear relationship between Net Sales and Commission. The positive value confirms that as Net Sales increase, Commission values also increase. The p-value of approximately 0 indicates this correlation is highly statistically significant, meaning it's extremely unlikely to have occurred by chance.
+ - Spearman correlation with 0.30 and p-value of 0 indicates a moderate positive monotonic relationship between the ranks of values rather than the raw values. 0.30 compared to the Pearson's 0.65 suggests that the relationship is more linear than monotonic, meaning there are likely outliers or non-uniform patterns affecting the rank-based correlation. The p-value of approximately 0 confirms this relationship is statistically significant.
+ - Kendall correlation of 0.26 and p-value 0 indicates a modest positive association between the two variables. The lower value compared to Pearson suggests outliers may be influencing the relationship. The p-value of approximately 0 confirms this relationship is statistically significant.
+ 
+The positive correlation confirms that higher net sales are associated with higher commissions, which aligns with typical commission structures. But the moderate Spearman and Kendall values suggest the commission structure may have different rates for different sales levels or product types.
+
+All three correlations have the same direction (positive) and statistical significance, telling us that a true relationship exists.
+
+
+```{r correlation matrix}
+
+#exclude non-numerical vars
+num_cols <- sapply(df, is.numeric)
+df_num <- df[, num_cols]
+
+
+# correlation matrix using corrplot
+corrplot(cor(df_num), method='number', type='upper')
+
+```
+
+Before creating a correlation matrix, non-numerical columns have been dropped. This is necessary as the correlation computation requires mathematical operations. Even if those columns are forcibly converted to numeric, the correlation results may be mathematically valid but meaningless, because the numeric values don't preserve any real relationship between categories.
+
+### Covariance
+
+```{r covariance}
+
+#covariance between DUration and COmmission
+cov <- cov(df$Duration, df$Commision..in.value.)
+cat(cov, '\n\n')
+
+```
+
+Covariance measures how two numerical variables vary together. There may be logical connection between Duration and Commissions where longer trips may have higher commissions. If commissions are tied to coverage or plan price, and longer trips cost more, we can expext a positive covariance.
+
+The covariance value of 695.03 is positive, indicating that as trip duration increases, commission tends to increase as well. The value itself does not convey any strength without considering the units and scales of the variables. Since there is a direct upward trend between the trip duration and commission amount, it may suggest that commission structures partially depend on trip duration.
+
+### Cosine similarity
+
+```{r cosine}
+
+#rename cols for easier access
+names(df)[names(df) == "Commision..in.value."] <- "Commission"
+names(df)[names(df) == "Net.Sales"] <- "Net_Sales"
+
+# select data and remove missing values
+data <- complete.cases(df$Net_Sales,df$Commission)
+net_sales <- df$Net_Sales[data]
+commission <- df$Commission[data]
+
+#cosine similarity
+cos <- cosine(net_sales, commission)
+cat('Cosine similarity between Net Sales and Commission:', cos, '\n\n')
+
+ggplot(df[data, ], aes(x=Net_Sales, y=Commission)) +
+  geom_point(alpha = 0.7, color = "blue") +
+  labs(title = "Scatter Plot of Net Sales vs. Commission",
+       subtitle = paste("Cosine Similarity =", round(cos, 4)),
+       x = "Net Sales", y = "Commission")
+```
+
+Unlike covariance or correlation, cosine similarity ignore magnitude and focuses on direction. The cosine similarity of 0.73 means that net sales and commission tend to point in a broadly similar direction in vector space. This makes sense as most data points lie along diagonals radiating out from the origin. But the similarity is not close to 1, meaning that some divergence in pattern. The shape of the data points suggests discrete bands of relationships. One cluster might show a consistent linear rate while another shows steeper or flatter trends. There's a dense cluster near the origin, suggesting some products result in commission even with little or no net sales. A few extreme values on top right indicate very high net sales and commission.
+
+## Confidence Intervals
+
+
+```{r confidence intervals}
+
+#function to compute mean and std err and find confidence interval
+comp_confint <- function(x) {
+  l_model <- lm(x ~ 1) #linear model
+  ci <- confint(l_model,level=0.95) #using 95 confidence interval
+  return(c(lower_95 = ci[1], upper_95=ci[2]))
+}
+
+#compute for all numeric cols
+cis <- as.data.frame(t(sapply(df_num, comp_confint)))
+cis
+
+#select non null values
+net_sales <- df$Net_Sales[!is.na(df$Net_Sales)]
+commission <- df$Commission[!is.na(df$Commission)]
+
+#t-scores, with different mu values for each column
+duration_test   <- t.test(df_num$Duration, mu = 90)
+net_sales_test  <- t.test(net_sales, mu = 0)
+commission_test <- t.test(commission, mu = 10)
+age_test        <- t.test(df_num$Age, mu = 40)
+
+t_scores <- c(Duration = duration_test$statistic,
+              Net_Sales = net_sales_test$statistic,
+              Commission = commission_test$statistic,
+              Age = age_test$statistic)
+
+t_scores
+
+```
+
+The confidence intervals outputs above give the range in which the true population mean likely falls, with 95% confidence. The values are rather very narrow, meaning that the sample means are estimated with high precision and variability is low.
+
+For trip duration, mu value of 90 days was used to reflect the common coverage length for standard travel insurance plans (according to a Google search). The t-score of -100.58 indicates that the average trip duration is much shorted than 90 days and this difference is statistically significant. For net sales, mu value of 0 was used to test test a break-even point of sales, whether or not the sales was profitable. The t-score of 209.69 confirms that the average net sales are positive, with statistical significance that it is well above the break-even. For commission, mu value of 10 was used to hypothesize $10 of flat commission. The t-score of -2.41 suggests that the average commission is significantly below 10 dolalrs. For Age, 40 was used as the benchmark of age expectation.  The t-score of -0.54 indicates that there is no statistical significance that the customer base is different from age of 40.
+
+
+
+
+
